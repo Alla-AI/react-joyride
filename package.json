@@ -33,17 +33,16 @@
   "sideEffects": false,
   "license": "MIT",
   "peerDependencies": {
-    "react": "15 - 18",
-    "react-dom": "15 - 18"
+    "react": "16.8 - 19",
+    "react-dom": "16.8 - 19"
   },
   "dependencies": {
     "@gilbarbara/deep-equal": "^0.3.1",
     "deep-diff": "^1.0.2",
     "deepmerge": "^4.3.1",
     "is-lite": "^1.2.1",
-    "react-floater": "^0.7.9",
+    "react-floater": "^0.9.5-3",
     "react-innertext": "^1.1.5",
-    "react-is": "^16.13.1",
     "scroll": "^3.0.1",
     "scrollparent": "^2.1.0",
     "tree-changes": "^0.11.2",
