@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "downlevelIteration": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "noEmit": true,
     "paths": {
       "~/*": ["src/*"]
