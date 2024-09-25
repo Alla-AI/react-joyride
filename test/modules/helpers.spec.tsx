@@ -5,7 +5,6 @@ import {
   getBrowser,
   getObjectType,
   getText,
-  hasValidKeys,
   hexToRGB,
   hideBeacon,
   isLegacy,
@@ -163,24 +162,6 @@ describe('helpers', () => {
     });
   });
 
-  describe('hasValidKeys', () => {
-    const validKeys = ['action', 'index', 'lifecycle', 'status'];
-
-    const object = {
-      action: 'open',
-      index: 0,
-      lifecycle: 'init',
-      status: 'ready',
-    };
-
-    it('should return properly', () => {
-      expect(hasValidKeys(object, validKeys)).toBe(true);
-
-      expect(hasValidKeys({ ...object, bub: 1 }, validKeys)).toBe(false);
-      expect(hasValidKeys({ ...object, bub: 1 })).toBe(false);
-    });
-  });
-
   describe('hexToRGB', () => {
     it('should convert properly', () => {
       expect(hexToRGB('#ff0044')).toEqual([255, 0, 68]);
@@ -192,7 +173,7 @@ describe('helpers', () => {
     });
   });
 
-  describe('hidBeacon', () => {
+  describe('hideBeacon', () => {
     const baseState = {
       action: ACTIONS.START,
       controlled: true,
@@ -225,7 +206,7 @@ describe('helpers', () => {
       {
         ...baseParameters,
         state: { ...baseState, action: ACTIONS.UPDATE },
-        expected: true,
+        expected: false,
       },
       {
         ...baseParameters,

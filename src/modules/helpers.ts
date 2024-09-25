@@ -116,14 +116,6 @@ export function getText(root: ReactNode): string {
   return content.join(' ').trim();
 }
 
-export function hasValidKeys(object: Record<string, unknown>, keys?: Array<string>): boolean {
-  if (!is.plainObject(object) || !is.array(keys)) {
-    return false;
-  }
-
-  return Object.keys(object).every(d => keys.includes(d));
-}
-
 /**
  * Convert hex to RGB
  */
@@ -142,8 +134,7 @@ export function hexToRGB(hex: string): Array<number> {
 export function hideBeacon(step: Step, state: State, continuous: boolean): boolean {
   const { action } = state;
 
-  const withContinuous =
-    continuous && ([ACTIONS.PREV, ACTIONS.NEXT, ACTIONS.UPDATE] as Actions[]).includes(action);
+  const withContinuous = continuous && ([ACTIONS.PREV, ACTIONS.NEXT] as Actions[]).includes(action);
 
   return step.disableBeacon || step.placement === 'center' || withContinuous;
 }
@@ -162,7 +153,7 @@ export function isLegacy(): boolean {
  */
 export function log({ data, debug = false, title, warn = false }: LogOptions) {
   /* eslint-disable no-console */
-  const logFn = warn ? console.warn || console.error : console.log;
+  const logFn = warn ? console.warn ?? console.error : console.log;
 
   if (debug) {
     if (title && data) {

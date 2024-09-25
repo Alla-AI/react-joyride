@@ -8,78 +8,79 @@ import Container from './Container';
 
 export default function Tooltip(props: TooltipProps) {
   const { continuous, helpers, index, isLastStep, setTooltipRef, size, step } = props;
+  const { close, next, prev, skip } = helpers;
 
   const handleClickBack = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
 
-    helpers.prev();
+    prev();
   };
 
   const handleClickClose = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
 
-    helpers.close('button_close');
+    close('button_close');
   };
 
   const handleClickPrimary = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
 
     if (!continuous) {
-      helpers.close('button_primary');
+      close('button_primary');
 
       return;
     }
 
-    helpers.next();
+    next();
   };
 
   const handleClickSkip = (event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
 
-    helpers.skip();
+    skip();
   };
 
   const getElementsProps = () => {
-    const back = getText(step.locale.back);
-    const close = getText(step.locale.close);
-    const last = getText(step.locale.last);
-    const next = getText(step.locale.next);
-    const skip = getText(step.locale.skip);
+    const backLocale = getText(step.locale.back);
+    const closeLocale = getText(step.locale.close);
+    const lastLocale = getText(step.locale.last);
+    const nextLocale = getText(step.locale.next);
+    const skipLocale = getText(step.locale.skip);
 
-    let primaryLabel = close;
-    let primaryText = close;
+    let primaryLabel = closeLocale;
+    let primaryText = closeLocale;
 
     if (continuous) {
-      primaryLabel = next;
-      primaryText = next;
+      primaryLabel = nextLocale;
+      primaryText = nextLocale;
 
       if (step.showProgress && !isLastStep) {
         primaryLabel = getText(step.locale.nextLabelWithProgress)
           .replace('{step}', String(index + 1))
           .replace('{steps}', String(size));
-        primaryText = `${next} (${index + 1}/${size})`;
+        primaryText = `${nextLocale} (${index + 1}/${size})`;
       }
 
       if (isLastStep) {
-        primaryLabel = last;
-        primaryText = last;
+        primaryLabel = lastLocale;
+        primaryText = lastLocale;
       }
     }
 
     return {
       backProps: {
-        'aria-label': back,
+        'aria-label': backLocale,
         'data-action': 'back',
         onClick: handleClickBack,
         role: 'button',
-        title: back,
+        title: backLocale,
       },
       closeProps: {
-        'aria-label': close,
+        'aria-label': closeLocale,
         'data-action': 'close',
         onClick: handleClickClose,
         role: 'button',
-        title: close,
+        title: closeLocale,
       },
       primaryProps: {
         'aria-label': primaryLabel,
@@ -89,11 +90,11 @@ export default function Tooltip(props: TooltipProps) {
         title: primaryText,
       },
       skipProps: {
-        'aria-label': skip,
+        'aria-label': skipLocale,
         'data-action': 'skip',
         onClick: handleClickSkip,
         role: 'button',
-        title: skip,
+        title: skipLocale,
       },
       tooltipProps: {
         'aria-modal': true,

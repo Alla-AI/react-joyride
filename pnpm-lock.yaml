@@ -14,9 +14,6 @@ importers:
       '@gilbarbara/hooks':
         specifier: ^0.8.2
         version: 0.8.2(react@18.3.1)
-      deep-diff:
-        specifier: ^1.0.2
-        version: 1.0.2
       deepmerge:
         specifier: ^4.3.1
         version: 4.3.1
@@ -35,9 +32,9 @@ importers:
       scrollparent:
         specifier: ^2.1.0
         version: 2.1.0
-      tree-changes:
+      tree-changes-hook:
         specifier: ^0.11.2
-        version: 0.11.2
+        version: 0.11.2(react@18.3.1)
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.16.1
@@ -105,6 +102,9 @@ importers:
       caniuse-lite:
         specifier: ^1.0.30001659
         version: 1.0.30001659
+      chalk:
+        specifier: ^5.3.0
+        version: 5.3.0
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -1888,9 +1888,6 @@ packages:
 
   decimal.js@10.4.3:
     resolution: {integrity: sha512-VBBaLc1MgL5XpzgIP7ny5Z6Nx3UrRkIViUkPUdtl9aya5amy3De1gsUUSB1g3+3sExYNjCAsAznmukyxCb1GRA==}
-
-  deep-diff@1.0.2:
-    resolution: {integrity: sha512-aWS3UIVH+NPGCD1kki+DCU9Dua032iSsO43LqQpcs4R3+dVv7tX0qBGjiVHJHjplsoUM2XRO/KB92glqc68awg==}
 
   deep-eql@5.0.2:
     resolution: {integrity: sha512-h5k/5U50IJJFpzfL6nO9jaaumfjO/f2NjK/oYB2Djzm4p9L+3T9qWpZqZ2hAbLPuuYq9wrU08WQyBTL5GbPk5Q==}
@@ -6158,8 +6155,6 @@ snapshots:
   decamelize@5.0.1: {}
 
   decimal.js@10.4.3: {}
-
-  deep-diff@1.0.2: {}
 
   deep-eql@5.0.2: {}
 

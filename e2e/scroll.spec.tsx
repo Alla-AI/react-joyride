@@ -57,7 +57,7 @@ test('should run the tour', async ({ mount, page }) => {
 
   expect(callback[1]).toEqual(
     formatCallbackResponse({
-      action: ACTIONS.START,
+      action: ACTIONS.UPDATE,
       index: 0,
       lifecycle: LIFECYCLE.READY,
       type: EVENTS.STEP_BEFORE,
@@ -316,16 +316,16 @@ test('should run the tour', async ({ mount, page }) => {
       action: ACTIONS.NEXT,
       index: 4,
       lifecycle: LIFECYCLE.COMPLETE,
-      status: STATUS.FINISHED,
+      status: STATUS.RUNNING,
       type: EVENTS.STEP_AFTER,
     }),
   );
 
   expect(callback[23]).toEqual(
     formatCallbackResponse({
-      action: ACTIONS.NEXT,
+      action: ACTIONS.UPDATE,
       index: 4,
-      lifecycle: LIFECYCLE.INIT,
+      lifecycle: LIFECYCLE.COMPLETE,
       status: STATUS.FINISHED,
       type: EVENTS.TOUR_END,
     }),
@@ -335,7 +335,7 @@ test('should run the tour', async ({ mount, page }) => {
     formatCallbackResponse({
       action: ACTIONS.RESET,
       index: 0,
-      lifecycle: LIFECYCLE.INIT,
+      lifecycle: LIFECYCLE.COMPLETE,
       status: STATUS.READY,
       type: EVENTS.TOUR_STATUS,
     }),
@@ -345,7 +345,7 @@ test('should run the tour', async ({ mount, page }) => {
     formatCallbackResponse({
       action: ACTIONS.STOP,
       index: 0,
-      lifecycle: LIFECYCLE.INIT,
+      lifecycle: LIFECYCLE.COMPLETE,
       status: STATUS.PAUSED,
       type: EVENTS.TOUR_STATUS,
     }),
