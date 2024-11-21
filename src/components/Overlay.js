@@ -18,7 +18,10 @@ import LIFECYCLE from '../constants/lifecycle';
 import Spotlight from './Spotlight';
 
 export default class JoyrideOverlay extends React.Component {
-  _isMounted = false;
+  isActive = false;
+  resizeTimeout;
+  scrollTimeout;
+  scrollParent;
   state = {
     mouseOverSpotlight: false,
     isScrolling: false,
@@ -26,6 +29,7 @@ export default class JoyrideOverlay extends React.Component {
   };
 
   static propTypes = {
+    continuous: PropTypes.bool,
     debug: PropTypes.bool.isRequired,
     disableOverlay: PropTypes.bool.isRequired,
     disableOverlayClose: PropTypes.bool,
@@ -41,16 +45,14 @@ export default class JoyrideOverlay extends React.Component {
   };
 
   componentDidMount() {
-    const { debug, disableScrolling, disableScrollParentFix, target } = this.props;
+    const { debug, disableScrolling, disableScrollParentFix = false, target } = this.props;
     const element = getElement(target);
 
-    this.scrollParent = getScrollParent(element, disableScrollParentFix, true);
-    this._isMounted = true;
+    this.scrollParent = getScrollParent(element ?? document.body, disableScrollParentFix, true);
+    this.isActive = true;
 
-    /* istanbul ignore else */
-    if (!disableScrolling) {
-      /* istanbul ignore else */
-      if (process.env.NODE_ENV === 'development' && hasCustomScrollParent(element, true)) {
+    if (process.env.NODE_ENV !== 'production') {
+      if (!disableScrolling && hasCustomScrollParent(element, true)) {
         log({
           title: 'step has a custom scroll parent and can cause trouble with scrolling',
           data: [{ key: 'parent', value: this.scrollParent }],
@@ -68,7 +70,7 @@ export default class JoyrideOverlay extends React.Component {
 
     /* istanbul ignore else */
     if (changed('lifecycle', LIFECYCLE.TOOLTIP)) {
-      this.scrollParent.addEventListener('scroll', this.handleScroll, { passive: true });
+      this.scrollParent?.addEventListener('scroll', this.handleScroll, { passive: true });
 
       setTimeout(() => {
         const { isScrolling } = this.state;
@@ -89,20 +91,52 @@ export default class JoyrideOverlay extends React.Component {
   }
 
   componentWillUnmount() {
-    this._isMounted = false;
+    this.isActive = false;
 
     window.removeEventListener('mousemove', this.handleMouseMove);
     window.removeEventListener('resize', this.handleResize);
 
     clearTimeout(this.resizeTimeout);
     clearTimeout(this.scrollTimeout);
-    this.scrollParent.removeEventListener('scroll', this.handleScroll);
+    this.scrollParent?.removeEventListener('scroll', this.handleScroll);
+  }
+
+  hideSpotlight = () => {
+    const { continuous, disableOverlay, lifecycle } = this.props;
+    const hiddenLifecycles = [LIFECYCLE.BEACON, LIFECYCLE.COMPLETE, LIFECYCLE.ERROR];
+    return (
+      disableOverlay ||
+      (continuous ? hiddenLifecycles.includes(lifecycle) : lifecycle !== LIFECYCLE.TOOLTIP)
+    );
+  };
+
+  get overlayStyles() {
+    const { mouseOverSpotlight } = this.state;
+    const { disableOverlayClose, placement, styles } = this.props;
+
+    let baseStyles = styles.overlay;
+
+    if (isLegacy()) {
+      baseStyles = placement === 'center' ? styles.overlayLegacyCenter : styles.overlayLegacy;
+    }
+
+    return {
+      cursor: disableOverlayClose ? 'default' : 'pointer',
+      height: getDocumentHeight(),
+      pointerEvents: mouseOverSpotlight ? 'none' : 'auto',
+      ...baseStyles,
+    };
   }
 
   get spotlightStyles() {
     const { showSpotlight } = this.state;
-    const { disableScrollParentFix, spotlightClicks, spotlightPadding, styles, target } =
-      this.props;
+    const {
+      disableScrollParentFix = false,
+      spotlightClicks,
+      spotlightPadding = 0,
+      styles,
+      target,
+    } = this.props;
     const element = getElement(target);
     const elementRect = getClientRect(element);
     const isFixedTarget = hasPosition(element);
@@ -110,14 +144,14 @@ export default class JoyrideOverlay extends React.Component {
 
     return {
       ...(isLegacy() ? styles.spotlightLegacy : styles.spotlight),
-      height: Math.round(elementRect.height + spotlightPadding * 2),
-      left: Math.round(elementRect.left - spotlightPadding),
+      height: Math.round((elementRect?.height ?? 0) + spotlightPadding * 2),
+      left: Math.round((elementRect?.left ?? 0) - spotlightPadding),
       opacity: showSpotlight ? 1 : 0,
       pointerEvents: spotlightClicks ? 'none' : 'auto',
       position: isFixedTarget ? 'fixed' : 'absolute',
       top,
       transition: 'opacity 0.2s',
-      width: Math.round(elementRect.width + spotlightPadding * 2),
+      width: Math.round((elementRect?.width ?? 0) + spotlightPadding * 2),
     };
   }
 
@@ -149,7 +183,7 @@ export default class JoyrideOverlay extends React.Component {
 
       clearTimeout(this.scrollTimeout);
 
-      this.scrollTimeout = setTimeout(() => {
+      this.scrollTimeout = window.setTimeout(() => {
         this.updateState({ isScrolling: false, showSpotlight: true });
       }, 50);
     } else if (hasPosition(element, 'sticky')) {
@@ -160,8 +194,8 @@ export default class JoyrideOverlay extends React.Component {
   handleResize = () => {
     clearTimeout(this.resizeTimeout);
 
-    this.resizeTimeout = setTimeout(() => {
-      if (!this._isMounted) {
+    this.resizeTimeout = window.setTimeout(() => {
+      if (!this.isActive) {
         return;
       }
 
@@ -170,50 +204,42 @@ export default class JoyrideOverlay extends React.Component {
   };
 
   updateState(state) {
-    if (!this._isMounted) {
+    if (!this.isActive) {
       return;
     }
 
-    this.setState(state);
+    this.setState(previousState => ({ ...previousState, ...state }));
   }
 
   render() {
-    const { mouseOverSpotlight, showSpotlight } = this.state;
-    const { disableOverlay, disableOverlayClose, lifecycle, onClickOverlay, placement, styles } =
-      this.props;
+    const { showSpotlight } = this.state;
+    const { hideSpotlight, overlayStyles, spotlightStyles } = this;
+    const { onClickOverlay, placement } = this.props;
 
-    if (disableOverlay || lifecycle !== LIFECYCLE.TOOLTIP) {
+    if (hideSpotlight()) {
       return null;
     }
 
-    let baseStyles = styles.overlay;
-
-    /* istanbul ignore else */
-    if (isLegacy()) {
-      baseStyles = placement === 'center' ? styles.overlayLegacyCenter : styles.overlayLegacy;
-    }
-
-    const stylesOverlay = {
-      cursor: disableOverlayClose ? 'default' : 'pointer',
-      height: getDocumentHeight(),
-      pointerEvents: mouseOverSpotlight ? 'none' : 'auto',
-      ...baseStyles,
-    };
-
     let spotlight = placement !== 'center' && showSpotlight && (
-      <Spotlight styles={this.spotlightStyles} />
+      <Spotlight styles={spotlightStyles} />
     );
 
     // Hack for Safari bug with mix-blend-mode with z-index
     if (getBrowser() === 'safari') {
-      const { mixBlendMode, zIndex, ...safarOverlay } = stylesOverlay;
+      const { mixBlendMode, zIndex, ...safarOverlay } = overlayStyles;
 
       spotlight = <div style={{ ...safarOverlay }}>{spotlight}</div>;
-      delete stylesOverlay.backgroundColor;
+      delete overlayStyles.backgroundColor;
     }
 
     return (
-      <div className="react-joyride__overlay" style={stylesOverlay} onClick={onClickOverlay}>
+      <div
+        className="react-joyride__overlay"
+        data-test-id="overlay"
+        onClick={onClickOverlay}
+        role="presentation"
+        style={overlayStyles}
+      >
         {spotlight}
       </div>
     );

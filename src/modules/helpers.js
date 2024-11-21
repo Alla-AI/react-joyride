@@ -3,6 +3,9 @@ import { isValidElement } from 'react';
 import { createPortal } from 'react-dom';
 import ExecutionEnvironment from 'exenv';
 import is from 'is-lite';
+import { LIFECYCLE } from '../constants';
+
+import { hasPosition } from './dom';
 
 export const { canUseDOM } = ExecutionEnvironment;
 export const isReact16 = createPortal !== undefined;
@@ -233,4 +236,16 @@ export function log({ title, data, warn = false, debug = false }: Object) {
     }
   }
   /* eslint-enable */
+}
+export function shouldScroll(options: any): boolean {
+  const { isFirstStep, lifecycle, previousLifecycle, scrollToFirstStep, step, target } = options;
+
+  return (
+    !step.disableScrolling &&
+    (!isFirstStep || scrollToFirstStep || lifecycle === LIFECYCLE.TOOLTIP) &&
+    step.placement !== 'center' &&
+    (!step.isFixed || !hasPosition(target)) && // fixed steps don't need to scroll
+    previousLifecycle !== lifecycle &&
+    [LIFECYCLE.BEACON, LIFECYCLE.TOOLTIP].includes(lifecycle)
+  );
 }

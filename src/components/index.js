@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import treeChanges from 'tree-changes';
 import is from 'is-lite';
 
-import Store from '../modules/store';
 import {
   getElement,
   getScrollParent,
@@ -12,11 +11,13 @@ import {
   hasPosition,
   scrollTo,
 } from '../modules/dom';
-import { canUseDOM, isEqual, log } from '../modules/helpers';
+import { canUseDOM, isEqual, log, shouldScroll } from '../modules/helpers';
 import { componentTypeWithRefs } from '../modules/propTypes';
 import { getMergedStep, validateSteps } from '../modules/step';
-
+import Overlay from './Overlay';
+import Portal from './Portal';
 import { ACTIONS, EVENTS, LIFECYCLE, STATUS } from '../constants';
+import createStore from '../modules/store';
 
 import Step from './Step';
 
@@ -24,7 +25,33 @@ class Joyride extends React.Component {
   constructor(props) {
     super(props);
 
-    this.state = this.initStore();
+    const { debug, getHelpers, run, stepIndex } = props;
+
+    this.store = createStore({
+      ...props,
+      controlled: run && is.number(stepIndex),
+    });
+    this.helpers = this.store.getHelpers();
+
+    const { addListener } = this.store;
+
+    log({
+      title: 'init',
+      data: [
+        { key: 'props', value: this.props },
+        { key: 'state', value: this.state },
+      ],
+      debug,
+    });
+
+    // Sync the store to this component's state.
+    addListener(this.syncState);
+
+    if (getHelpers) {
+      getHelpers(this.helpers);
+    }
+
+    this.state = this.store.getState();
   }
 
   static propTypes = {
@@ -148,7 +175,7 @@ class Joyride extends React.Component {
 
     // Update the index if the first step is not found
     if (!controlled && status === STATUS.RUNNING && index === 0 && !target) {
-      update({ index: index + 1 });
+      this.store.update({ index: index + 1 });
       this.callback({
         ...this.state,
         type: EVENTS.TARGET_NOT_FOUND,
@@ -205,29 +232,16 @@ class Joyride extends React.Component {
         ...callbackData,
         type: EVENTS.TOUR_START,
       });
-    } else if (changed('status')) {
-      this.callback({
-        ...callbackData,
-        type: EVENTS.TOUR_STATUS,
-      });
-    } else if (changed('action', ACTIONS.RESET)) {
+    } else if (changed('status') || changed('action', ACTIONS.RESET)) {
       this.callback({
         ...callbackData,
         type: EVENTS.TOUR_STATUS,
       });
     }
+    this.scrollToStep(prevState);
 
-    if (step) {
-      this.scrollToStep(prevState);
-
-      if (
-        step.placement === 'center' &&
-        status === STATUS.RUNNING &&
-        action === ACTIONS.START &&
-        lifecycle === LIFECYCLE.INIT
-      ) {
-        update({ lifecycle: LIFECYCLE.READY });
-      }
+    if (step.placement === 'center' && status === STATUS.RUNNING && lifecycle === LIFECYCLE.INIT) {
+      this.store.update({ lifecycle: LIFECYCLE.READY });
     }
   }
 
@@ -240,112 +254,9 @@ class Joyride extends React.Component {
     }
   }
 
-  initStore = () => {
-    const { debug, getHelpers, run, stepIndex } = this.props;
-
-    this.store = new Store({
-      ...this.props,
-      controlled: run && is.number(stepIndex),
-    });
-    this.helpers = this.store.getHelpers();
-
-    const { addListener } = this.store;
-
-    log({
-      title: 'init',
-      data: [
-        { key: 'props', value: this.props },
-        { key: 'state', value: this.state },
-      ],
-      debug,
-    });
-
-    // Sync the store to this component's state.
-    addListener(this.syncState);
-
-    getHelpers(this.helpers);
-
-    return this.store.getState();
-  };
-
-  scrollToStep(prevState) {
-    const { index, lifecycle, status } = this.state;
-    const {
-      debug,
-      disableScrollParentFix,
-      scrollToFirstStep,
-      scrollOffset,
-      scrollDuration,
-      steps,
-    } = this.props;
-    const step = getMergedStep(steps[index], this.props);
-
-    /* istanbul ignore else */
-    if (step) {
-      const target = getElement(step.target);
-      const shouldScroll = this.shouldScroll(
-        step.disableScrolling,
-        index,
-        scrollToFirstStep,
-        lifecycle,
-        step,
-        target,
-        prevState,
-      );
-
-      if (status === STATUS.RUNNING && shouldScroll) {
-        const hasCustomScroll = hasCustomScrollParent(target, disableScrollParentFix);
-        const scrollParent = getScrollParent(target, disableScrollParentFix);
-        let scrollY = Math.floor(getScrollTo(target, scrollOffset, disableScrollParentFix)) || 0;
-
-        log({
-          title: 'scrollToStep',
-          data: [
-            { key: 'index', value: index },
-            { key: 'lifecycle', value: lifecycle },
-            { key: 'status', value: status },
-          ],
-          debug,
-        });
-
-        /* istanbul ignore else */
-        if (lifecycle === LIFECYCLE.BEACON && this.beaconPopper) {
-          const { placement, popper } = this.beaconPopper;
-
-          /* istanbul ignore else */
-          if (!['bottom'].includes(placement) && !hasCustomScroll) {
-            scrollY = Math.floor(popper.top - scrollOffset);
-          }
-        } else if (lifecycle === LIFECYCLE.TOOLTIP && this.tooltipPopper) {
-          const { flipped, placement, popper } = this.tooltipPopper;
-
-          if (['top', 'right', 'left'].includes(placement) && !flipped && !hasCustomScroll) {
-            scrollY = Math.floor(popper.top - scrollOffset);
-          } else {
-            scrollY -= step.spotlightPadding;
-          }
-        }
-
-        scrollY = scrollY >= 0 ? scrollY : 0;
-
-        /* istanbul ignore else */
-        if (status === STATUS.RUNNING) {
-          scrollTo(scrollY, scrollParent, scrollDuration);
-        }
-      }
-    }
-  }
-
-  /**
-   * Trigger the callback.
-   *
-   * @private
-   * @param {Object} data
-   */
   callback = data => {
     const { callback } = this.props;
 
-    /* istanbul ignore else */
     if (is.function(callback)) {
       callback(data);
     }
@@ -357,70 +268,150 @@ class Joyride extends React.Component {
    * @private
    * @param {Event} e - Keyboard event
    */
-  handleKeyboard = e => {
+  handleKeyboard = event => {
     const { index, lifecycle } = this.state;
     const { steps } = this.props;
     const step = steps[index];
-    const intKey = window.Event ? e.which : e.keyCode;
 
     if (lifecycle === LIFECYCLE.TOOLTIP) {
-      if (intKey === 27 && step && !step.disableCloseOnEsc) {
-        this.store.close();
+      if (event.code === 'Escape' && step && !step.disableCloseOnEsc) {
+        this.store.close('keyboard');
       }
+    }
+  };
+
+  handleClickOverlay = () => {
+    const { index } = this.state;
+    const { steps } = this.props;
+
+    const step = getMergedStep(this.props, steps[index]);
+
+    if (!step.disableOverlayClose) {
+      this.helpers.close('overlay');
     }
   };
 
   /**
    * Sync the store with the component's state
-   *
-   * @param {Object} state
    */
   syncState = state => {
     this.setState(state);
   };
 
-  setPopper = (popper, type) => {
-    if (type === 'wrapper') {
-      this.beaconPopper = popper;
-    } else {
-      this.tooltipPopper = popper;
-    }
-  };
+  scrollToStep(prevState) {
+    const { index, lifecycle, status } = this.state;
+    const {
+      debug,
+      disableScrollParentFix = false,
+      scrollToFirstStep = false,
+      scrollOffset = 20,
+      scrollDuration,
+      steps,
+    } = this.props;
+    const step = getMergedStep(steps[index], this.props);
+    const target = getElement(step.target);
+    const shouldScrollToStep = shouldScroll({
+      isFirstStep: index === 0,
+      lifecycle,
+      previousLifecycle: prevState.lifecycle,
+      scrollToFirstStep,
+      step,
+      target,
+    });
+    if (status === STATUS.RUNNING && shouldScrollToStep) {
+      const hasCustomScroll = hasCustomScrollParent(target, disableScrollParentFix);
+      const scrollParent = getScrollParent(target, disableScrollParentFix);
+      let scrollY = Math.floor(getScrollTo(target, scrollOffset, disableScrollParentFix)) || 0;
 
-  shouldScroll = (disableScrolling, index, scrollToFirstStep, lifecycle, step, target, prevState) =>
-    !disableScrolling &&
-    (index !== 0 || scrollToFirstStep || lifecycle === LIFECYCLE.TOOLTIP) &&
-    step.placement !== 'center' &&
-    (!step.isFixed || !hasPosition(target)) && // fixed steps don't need to scroll
-    prevState.lifecycle !== lifecycle &&
-    [LIFECYCLE.BEACON, LIFECYCLE.TOOLTIP].includes(lifecycle);
+      log({
+        title: 'scrollToStep',
+        data: [
+          { key: 'index', value: index },
+          { key: 'lifecycle', value: lifecycle },
+          { key: 'status', value: status },
+        ],
+        debug,
+      });
+      const beaconPopper = this.store.getPopper('beacon');
+      const tooltipPopper = this.store.getPopper('tooltip');
+
+      if (lifecycle === LIFECYCLE.BEACON && beaconPopper) {
+        const { offsets, placement } = beaconPopper;
+
+        if (!['bottom'].includes(placement) && !hasCustomScroll) {
+          scrollY = Math.floor(offsets.popper.top - scrollOffset);
+        }
+      } else if (lifecycle === LIFECYCLE.TOOLTIP && tooltipPopper) {
+        const { flipped, offsets, placement } = tooltipPopper;
+
+        if (['top', 'right', 'left'].includes(placement) && !flipped && !hasCustomScroll) {
+          scrollY = Math.floor(offsets.popper.top - scrollOffset);
+        } else {
+          scrollY -= step.spotlightPadding;
+        }
+      }
+
+      scrollY = scrollY >= 0 ? scrollY : 0;
+
+      if (status === STATUS.RUNNING) {
+        scrollTo(scrollY, { element: scrollParent, duration: scrollDuration }).then(() => {
+          setTimeout(() => {
+            this.store.getPopper('tooltip')?.instance.update();
+          }, 10);
+        });
+      }
+    }
+  }
 
   render() {
     if (!canUseDOM) return null;
 
-    const { index, status } = this.state;
-    const { continuous, debug, nonce, scrollToFirstStep, steps } = this.props;
-    const step = getMergedStep(steps[index], this.props);
-    let output;
+    const { index, lifecycle, status } = this.state;
+    const {
+      continuous = false,
+      debug = false,
+      nonce,
+      scrollToFirstStep = false,
+      steps,
+    } = this.props;
+    const isRunning = status === STATUS.RUNNING;
+    const content = {};
 
-    if (status === STATUS.RUNNING && step) {
-      output = (
+    if (isRunning && steps[index]) {
+      const step = getMergedStep(steps[index], this.props);
+      content.step = (
         <Step
           {...this.state}
           callback={this.callback}
           continuous={continuous}
           debug={debug}
-          setPopper={this.setPopper}
           helpers={this.helpers}
           nonce={nonce}
           shouldScroll={!step.disableScrolling && (index !== 0 || scrollToFirstStep)}
           step={step}
-          update={this.store.update}
+          store={this.store}
         />
+      );
+
+      content.overlay = (
+        <Portal id="react-joyride-portal">
+          <Overlay
+            {...step}
+            continuous={continuous}
+            debug={debug}
+            lifecycle={lifecycle}
+            onClickOverlay={this.handleClickOverlay}
+          />
+        </Portal>
       );
     }
 
-    return <div className="react-joyride">{output}</div>;
+    return (
+      <div className="react-joyride">
+        {content.step}
+        {content.overlay}
+      </div>
+    );
   }
 }
 

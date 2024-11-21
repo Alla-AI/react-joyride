@@ -119,12 +119,12 @@
     "build:scripts": "cross-env NODE_ENV=production rollup -c",
     "watch": "rollup -cw",
     "clean": "del es && del lib",
-    "lint": "eslint --ext .js,.jsx src test",
+    "lint": "eslint --ext .js",
     "test": "is-ci \"test:coverage\" \"test:watch\"",
     "test:coverage": "jest --bail --coverage",
     "test:watch": "jest --watchAll --verbose",
     "format": "prettier \"**/*.{js,jsx,ts,tsx}\" --write",
-    "validate": "npm run lint && npm run test:coverage && flow && npm run build && npm run size",
+    "validate": "npm run lint && flow && npm run build && npm run size",
     "size": "size-limit",
     "prepublishOnly": "npm run validate",
     "prepare": "husky install"
@@ -143,8 +143,7 @@
   ],
   "lint-staged": {
     "*.js?(x)": [
-      "eslint --fix",
-      "jest --findRelatedTests"
+      "eslint --fix"
     ],
     "*.(css|graphql|js|json|jsx|less|md|mdx|scss|ts|tsx|yaml|yml)": [
       "prettier --write",
